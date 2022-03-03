@@ -56,8 +56,9 @@ class ResidualBlock(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, num_layers, block, num_classes=10):
+    def __init__(self, num_layers, block, num_classes=7):
         super(ResNet, self).__init__()
+
         self.num_layers = num_layers
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3,
                                stride=1, padding=1, bias=False)
@@ -71,6 +72,8 @@ class ResNet(nn.Module):
         self.layers_6n = self.get_layers(block, 32, 64, stride=2)
 
         self.avg_pool = nn.AvgPool2d(8, stride=1)
+        # self.fc_out = nn.Linear(153664, 2000)
+        # self.fc_out = nn.Linear(2000, num_classes)
         self.fc_out = nn.Linear(64, num_classes)
 
     def get_layers(self, block, in_channels, out_channels, stride):
@@ -103,5 +106,15 @@ class ResNet(nn.Module):
 
 def resnet8_gn(num_classes=7):
     block = ResidualBlock
-    model = ResNet(1, block, num_classes)
+    model = ResNet(1, block, num_classes=num_classes)
+    return model
+
+# GN 바꾸고 싶으면
+# https://discuss.pytorch.org/t/how-to-change-all-bn-layers-to-gn/21848/2
+def resnet18_modify(num_classes=7):
+    import torchvision.models as models
+    model = models.resnet18(pretrained=False)
+    num_ftrs = model.fc.in_features # 512
+
+    model.fc = nn.Linear(num_ftrs,num_classes)
     return model

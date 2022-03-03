@@ -23,7 +23,7 @@ import wandb
 # custom libraries
 from arguments import get_args
 from dataset import HAM10000, preprocess_df
-from model import resnet8_gn
+from model import resnet8_gn, resnet18_modify
 
 def xavier_nets(m):
     if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d):
@@ -47,6 +47,8 @@ def init_nets(args):
                 net.apply(xavier_nets)
             else:
                 print('sustain he init')
+        elif args.model == "resnet18":
+            net = resnet18_modify(num_classes=args.num_classes)
         else:
             raise NotImplementedError
 
@@ -84,7 +86,7 @@ def train_net(net_id, net,
             loss = criterion(out, target)
 
             _, pred = torch.max(out, 1)
-            correct = torch.sum(out == target)
+            correct = torch.sum(pred == target)
             loss.backward()
             optimizer.step()
 
@@ -126,7 +128,7 @@ def test_net(net_id, net,
                 loss = criterion(out, target)
 
                 _, pred = torch.max(out, 1)
-                correct = torch.sum(out == target)
+                correct = torch.sum(pred == target)
 
                 batch_cnt += 1
                 data_cnt += target.shape[0]
@@ -155,6 +157,7 @@ if __name__=='__main__':
     nets, local_model_meta_data, layer_type = init_nets(args)
     net_id = 0
     net = nets[net_id]
+    net.to(args.device)
 
     # -- transform
     # precomputed values. refer to jupyter notebook
@@ -169,7 +172,6 @@ if __name__=='__main__':
 
     # -- dataset
     df_train, df_val = preprocess_df(args)
-    breakpoint()
     # Define the training set using the table train_df and using our defined transitions (train_transform)
     training_set = HAM10000(df_train, transform=train_transform)
     train_loader = DataLoader(training_set, batch_size=args.batch_size, shuffle=True, num_workers=4)
@@ -192,7 +194,7 @@ if __name__=='__main__':
                   train_dataloader=train_loader,
                   epochs=args.epochs)
         print(f' Training at {round} : loss: {train_loss:.6f}, acc:{train_acc:.6%}')
-        test_acc, test_loss, test_lr = test_net(net_id, net,
+        test_acc, test_loss = test_net(net_id, net,
                                                 test_dataloader=val_loader,
                                                 epochs=args.epochs)
         print(f' Test at {round} : loss: {test_loss:.6f}, acc:{test_acc:2.6%}')
