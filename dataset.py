@@ -10,9 +10,34 @@ import numpy as np
 from PIL import Image
 
 from sklearn.model_selection import train_test_split
+import pickle
+
+from arguments import get_args
 
 # Define a pytorch dataloader for this dataset
 class HAM10000(Dataset):
+    def __init__(self, df ,mode, data_dir = '/opt/ml/fl_ham/input/saved_data',transform=None):
+        with open(os.path.join(data_dir,mode+'.npy'), 'rb') as f:
+            self.img = np.load(f)
+        print(f' data for {mode} loaded.')
+        self.df = df
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.img)
+
+    def __getitem__(self, index):
+        # Load data and get label
+        # X = Image.open(self.df['path'][index])
+        X = self.img[index]
+        y = torch.tensor(int(self.df['cell_type_idx'][index]))
+
+        if self.transform:
+            X = self.transform(X)
+
+        return X.float(), y
+
+class HAM10000_ORG(Dataset):
     def __init__(self, df, transform=None):
         self.df = df
         self.transform = transform
@@ -108,3 +133,37 @@ def preprocess_df(args):
 
 def read_preprocessed_df():
     pass
+
+def save_to_pickle(args):
+    df_train, df_val = preprocess_df(args)
+    # train_list = np.zeros((len(df_train), 32,32,3))
+    # for train_idx in tqdm(range(len(df_train))):
+    #     train_img = Image.open(df_train['path'][train_idx])
+    #     img = train_img.resize((32,32))
+    #     img = np.asarray(img)
+    #     train_list[train_idx] = img
+    # with open('/opt/ml/fl_ham/input/saved_data/train.npy','wb') as f:
+    #     np.save(f, train_list)
+    # del train_list
+    # print(f'training set done')
+
+    val_list = np.zeros((len(df_val), 32 ,32 , 3))
+    for val_idx in tqdm(range(len(df_val))):
+        val_img = Image.open(df_val['path'][val_idx])
+        img = val_img.resize((32, 32))
+        img = np.asarray(img)
+        val_list[val_idx] = img
+    with open('/opt/ml/fl_ham/input/saved_data/eval.npy','wb') as f:
+        np.save(f, val_list)
+    print(f'validation set done')
+    del val_list
+if __name__=='__main__':
+    import numpy as np
+    args = get_args()
+    # df_train, df_val = preprocess_df(args)
+    #
+    # test_img = Image.open(df_train['path'][0])
+    # breakpoint()
+    # test_npy = np.array(test_img)
+    save_to_pickle(args)
+
