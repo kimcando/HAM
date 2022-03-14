@@ -25,6 +25,12 @@ from arguments import get_args
 from dataset import HAM10000, preprocess_df
 from model import resnet8_gn, resnet18_modify, BaseCNN, CNN
 
+# lr finder
+from torch_lr_finder import LRFinder
+
+# save plot
+from matplotlib import pyplot as plt
+
 def xavier_nets(m):
     if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d):
         torch.nn.init.xavier_uniform(m.weight)
@@ -152,13 +158,9 @@ def test_net(net_id, net,
 if __name__=='__main__':
 
     args = get_args()
-    if args.pretrained:
-        pretrain='pretrain'
-    else:
-        pretrain = 'scratch'
     if args.wandb_log:
         wandb.init(project='single_model',
-                   name=f'{args.exp_name}_{args.model}_{args.lr}_{pretrain}',
+                   name=f'{args.exp_name}_{args.model}_{args.lr}',
                    entity='feddu')
         wandb.config.update(args)
 
@@ -197,6 +199,18 @@ if __name__=='__main__':
     optimizer = optim.SGD(filter(lambda p: p.requires_grad, net.parameters()), lr=args.lr,
                           momentum=args.rho,
                           weight_decay=args.reg, nesterov=args.nesterov)
+    criterion = nn.CrossEntropyLoss()
+    # https://github.com/davidtvs/pytorch-lr-finder/blob/master/examples/lrfinder_cifar10.ipynb
+    # lr finder mathmetical theory
+    # https://discuss.pytorch.org/t/get-the-best-learning-rate-automatically/58269/6
+    lr_finder = LRFinder(net, optimizer, criterion, device = args.device)
+    lr_finder.range_test(train_loader, end_lr=1, num_iter=500) #fig에서 왜 자꾸 steepest만 return해주지..ㅠㅠ
+    breakpoint()
+    fig, suggested_lr = lr_finder.plot()
+    fig.figure.savefig('./lr_curve_pretrained_false.png')
+
+
+    """
     mile_step = list(map(int, args.lr_decay_stepsize))
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=mile_step,
                                                gamma=args.lr_decay_gamma)
@@ -222,3 +236,4 @@ if __name__=='__main__':
                 'Test/acc': test_acc,
                 'Test/loss': test_loss
             })
+    """

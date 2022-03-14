@@ -164,9 +164,9 @@ def resnet8_gn(num_classes=7):
 
 # GN 바꾸고 싶으면
 # https://discuss.pytorch.org/t/how-to-change-all-bn-layers-to-gn/21848/2
-def resnet18_modify(num_classes=7):
+def resnet18_modify(num_classes=7, use_pretrained=True):
     import torchvision.models as models
-    model = models.resnet18(pretrained=False)
+    model = models.resnet18(pretrained=use_pretrained)
     num_ftrs = model.fc.in_features # 512
 
     model.fc = nn.Linear(num_ftrs,num_classes)

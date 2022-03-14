@@ -15,6 +15,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     # -- model
     parser.add_argument('--model', type=str, default='resnet8_gn', help='neural network used in training')
+    parser.add_argument('--pretrained', type=str2bool, default=True, help='use pretrained network or not')
     parser.add_argument('--init_type', type=str, default='xavier', help='init type: xavier, layerwise')
     parser.add_argument('--is_same_initial', type=int, default=1,
                         help='Whether initial all the models with the same parameters in fedavg')

@@ -48,7 +48,7 @@ def init_nets(args):
             else:
                 print('sustain he init')
         elif args.model == "resnet18":
-            net = resnet18_modify(num_classes=args.num_classes, use_pretrained=args.pretrained)
+            net = resnet18_modify(num_classes=args.num_classes)
 
         elif args.model == "basemodel":
             net = BaseCNN(num_classes=args.num_classes)
@@ -152,13 +152,9 @@ def test_net(net_id, net,
 if __name__=='__main__':
 
     args = get_args()
-    if args.pretrained:
-        pretrain='pretrain'
-    else:
-        pretrain = 'scratch'
     if args.wandb_log:
         wandb.init(project='single_model',
-                   name=f'{args.exp_name}_{args.model}_{args.lr}_{pretrain}',
+                   name=f'{args.exp_name}_{args.model}_{args.lr}',
                    entity='feddu')
         wandb.config.update(args)
 
