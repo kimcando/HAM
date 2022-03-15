@@ -24,7 +24,7 @@ import wandb
 # custom libraries
 from arguments import get_args
 from dataset import HAM10000, preprocess_df
-from model import resnet8_gn, resnet18_modify, BaseCNN, CNN
+from model import resnet8_gn, resnet18_modify, BaseCNN, CNN, GradCamModel
 
 def xavier_nets(m):
     if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d):
@@ -40,7 +40,8 @@ def init_nets(args):
     nets = {net_i: None for net_i in range(args.n_parties)}
 
     for net_i in range(args.n_parties):
-
+        net = GradCamModel(args)
+        """
         if args.model == "resnet8_gn":
             net = resnet8_gn(num_classes=args.num_classes)
             if args.init_type == "xavier":
@@ -57,7 +58,7 @@ def init_nets(args):
             net = CNN(num_classes=args.num_classes)
         else:
             raise NotImplementedError
-
+        """
         nets[net_i] = net
         model_meta_data = []
         layer_type = []
@@ -87,13 +88,34 @@ def train_net(net_id, net,
 
             optimizer.zero_grad()
             target = target.long()
-
-            out = net(x)
+            # https://ichi.pro/ko/pytorchui-gradcam-135721179052517
+            out, selected = net(x) # selected shape: torch.Size([64, 64, 8, 8])
+            selected = selected.detach().cpu()
+            breakpoint()
             loss = criterion(out, target)
 
             _, pred = torch.max(out, 1)
             correct = torch.sum(pred == target)
             loss.backward()
+            grads = net.get_act_grads().detach().cpu()
+            pooled_grads = torch.mean(grads, dim=[0, 2, 3]).detach().cpu()
+            for i in range(selected.shape[1]):
+                selected[:, i, :, :] += pooled_grads[i]
+            heatmap_j = torch.mean(selected, dim=1).squeeze()
+            heatmap_j_max = heatmap_j.max(axis=0)[0]
+            heatmap_j /= heatmap_j_max
+            breakpoint()
+            import torchvision
+            import matplotlib.pyplot as plt
+
+            resize = torchvision.transforms.Resize((32, 32))
+            heatmap_j = resize(heatmap_j)
+            # heatmap_j = resize(heatmap_j, (32, 32), preserve_range=True)
+            breakpoint()
+            cmap = plt.cm.get_cmap('jet',256)
+            heatmap_j2 = cmap(heatmap_j, alpha=0.2)
+
+            breakpoint()
             optimizer.step()
 
             batch_cnt += 1

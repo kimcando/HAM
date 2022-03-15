@@ -49,7 +49,7 @@ def init_nets(args):
             else:
                 print('sustain he init')
         elif args.model == "resnet18":
-            net = resnet18_modify(num_classes=args.num_classes, freeze=args.freeze, bn_freeze = args.bn_freeze, use_pretrained=args.pretrained)
+            net = resnet18_modify(num_classes=args.num_classes,freeze = args.freeze, bn_freeze = args.bn_freeze, use_pretrained=args.pretrained)
 
         elif args.model == "basemodel":
             net = BaseCNN(num_classes=args.num_classes)
@@ -150,11 +150,24 @@ def test_net(net_id, net,
     total_loss = loss_val/batch_cnt
     return total_acc, total_loss
 
+# def freeze_partial(net, freeze_list=None):
+#     breakpoint()
+#     for param in net.parameters():
+#         param.requires_grad=False
+
+
+
 if __name__=='__main__':
 
     args = get_args()
     if args.pretrained:
-        pretrain='pretrain'
+        if args.freeze:
+            if args.bn_freeze:
+                pretrain = 'all-freeze'
+            else:
+                pretrain = 'partial-freeze(bn-train)'
+        else:
+            pretrain = 'pretrain'
     else:
         pretrain = 'scratch'
     if args.wandb_log:
@@ -167,6 +180,7 @@ if __name__=='__main__':
     nets, local_model_meta_data, layer_type = init_nets(args)
     net_id = 0
     net = nets[net_id]
+    # freeze_partial(net)
     net.to(args.device)
 
     # -- transform

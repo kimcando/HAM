@@ -2,6 +2,105 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
+# https://ichi.pro/ko/pytorchui-gradcam-135721179052517
+class GradCamModel_ORG(nn.Module):
+    """
+    for original size model
+    """
+    def __init__(self,args):
+        super().__init__()
+        self.gradients = None
+        self.tensorhook = []
+        self.layerhook = []
+        self.selected_out = None
+
+        # PRETRAINED MODEL
+        if args.model == 'resnet8_gn':
+            self.pretrained = resnet8_gn(num_classes=args.num_classes)
+        elif args.model == 'resnet18':
+            from torchvision import models
+            # input size에 따라서..ㅠㅠ
+            self.pretrained = models.resnet50(pretrained=True)
+            #https://discuss.pytorch.org/t/how-to-extract-features-of-an-image-from-a-trained-model/119/3
+            # self.extractor = nn.Sequential(*list(self.pretrained.children())[:-2])
+            self.pretrained = resnet18_modify(num_classes=args.num_classes,
+                                              freeze = args.freeze, bn_freeze = args.bn_freeze,
+                                              use_pretrained=args.pretrained)
+
+        self.layerhook.append(self.pretrained.layer4.register_forward_hook(self.forward_hook()))
+
+        for p in self.pretrained.parameters():
+            p.requires_grad = True
+
+    def activations_hook(self, grad):
+        self.gradients = grad
+
+    def get_act_grads(self):
+        return self.gradients
+
+    def forward_hook(self):
+        def hook(module, inp, out):
+            self.selected_out = out
+            self.tensorhook.append(out.register_hook(self.activations_hook))
+
+        return hook
+
+    def forward(self, x):
+        out = self.pretrained(x)
+        # for name, module in self.pretrained.submodule
+        breakpoint()
+        return out, self.selected_out
+
+class GradCamModel(nn.Module):
+    """
+    for original size model
+    """
+    def __init__(self,args):
+        super().__init__()
+        self.gradients = None
+        self.tensorhook = []
+        self.layerhook = []
+        self.selected_out = None
+
+        # PRETRAINED MODEL
+        if args.model == 'resnet8_gn':
+            self.pretrained = resnet8_gn(num_classes=args.num_classes)
+            self.layerhook.append(self.pretrained.layers_6n.register_forward_hook(self.forward_hook()))
+
+        elif args.model == 'resnet18':
+            from torchvision import models
+            # input size에 따라서..ㅠㅠ
+            # self.pretrained = models.resnet50(pretrained=True)
+            #https://discuss.pytorch.org/t/how-to-extract-features-of-an-image-from-a-trained-model/119/3
+            # self.extractor = nn.Sequential(*list(self.pretrained.children())[:-2])
+            self.pretrained = resnet18_modify(num_classes=args.num_classes,
+                                              freeze = args.freeze, bn_freeze = args.bn_freeze,
+                                              use_pretrained=args.pretrained)
+
+            self.layerhook.append(self.pretrained.layer4.register_forward_hook(self.forward_hook()))
+
+        # for p in self.pretrained.parameters():
+        #     p.requires_grad = True
+
+    def activations_hook(self, grad):
+        self.gradients = grad
+
+    def get_act_grads(self):
+        return self.gradients
+
+    def forward_hook(self):
+        def hook(module, inp, out):
+            self.selected_out = out
+            self.tensorhook.append(out.register_hook(self.activations_hook))
+
+        return hook
+
+    def forward(self, x):
+        out = self.pretrained(x)
+        # for name, module in self.pretrained.submodule
+        return out, self.selected_out
+
 class CNN(nn.Module):
     def __init__(self,num_classes=7):
         """
@@ -157,6 +256,18 @@ class ResNet(nn.Module):
         x = self.fc_out(x)
         return x
 
+def freeze_partial(net, bn_freeze = True,freeze_list=None):
+
+    for idx, (name,param) in enumerate(net.named_parameters()):
+        if not bn_freeze:
+            if 'bn' in name:
+                pass
+            else:
+                param.requires_grad = False
+        else:
+            param.requires_grad = False
+
+
 def resnet8_gn(num_classes=7):
     block = ResidualBlock
     model = ResNet(1, block, num_classes=num_classes)
@@ -164,10 +275,25 @@ def resnet8_gn(num_classes=7):
 
 # GN 바꾸고 싶으면
 # https://discuss.pytorch.org/t/how-to-change-all-bn-layers-to-gn/21848/2
-def resnet18_modify(num_classes=7, use_pretrained=True):
+def resnet18_modify(num_classes=7, freeze=False, bn_freeze=True,use_pretrained=True):
     import torchvision.models as models
     model = models.resnet18(pretrained=use_pretrained)
+
+    if freeze:
+        print(f'now freezing: {freeze }! bn frezzing: {bn_freeze}')
+        freeze_partial(model,bn_freeze)
     num_ftrs = model.fc.in_features # 512
 
     model.fc = nn.Linear(num_ftrs,num_classes)
     return model
+
+if __name__=='__main__':
+    from torchsummary import summary
+    from torchvision import models
+    breakpoint()
+    # test_model = models.resnet50(pretrained=True)
+    test_model = resnet8_gn(7)
+    test_model.to('cuda')
+    test_input = torch.rand((3,224,224))
+    breakpoint()
+    summary(test_model, (3,32,32))

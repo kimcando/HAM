@@ -1,4 +1,4 @@
-# version for 32x32
+# use origianl image resized
 import os
 import numpy as np
 import pandas as pd
@@ -23,7 +23,7 @@ import wandb
 
 # custom libraries
 from arguments import get_args
-from dataset import HAM10000, preprocess_df
+from dataset import HAM10000_ORG, preprocess_df
 from model import resnet8_gn, resnet18_modify, BaseCNN, CNN
 
 def xavier_nets(m):
@@ -49,7 +49,7 @@ def init_nets(args):
             else:
                 print('sustain he init')
         elif args.model == "resnet18":
-            net = resnet18_modify(num_classes=args.num_classes, freeze=args.freeze, bn_freeze = args.bn_freeze, use_pretrained=args.pretrained)
+            net = resnet18_modify(num_classes=args.num_classes,freeze=args.freeze, bn_freeze = args.bn_freeze,use_pretrained=args.pretrained)
 
         elif args.model == "basemodel":
             net = BaseCNN(num_classes=args.num_classes)
@@ -154,7 +154,13 @@ if __name__=='__main__':
 
     args = get_args()
     if args.pretrained:
-        pretrain='pretrain'
+        if args.freeze:
+            if args.bn_freeze:
+                pretrain= 'all-freeze'
+            else:
+                pretrain= 'partial-freeze(bn-train)'
+        else:
+            pretrain='pretrain'
     else:
         pretrain = 'scratch'
     if args.wandb_log:
@@ -171,28 +177,31 @@ if __name__=='__main__':
 
     # -- transform
     # precomputed values. refer to jupyter notebook
-    norm_mean, norm_std = [0.7630318, 0.5456445, 0.5700395], [0.1409281, 0.15261307, 0.16997099]
-    # train_transform = transforms.Compose([transforms.Resize((args.input_size, args.input_size)),
-    #                                         transforms.ToTensor(),
-    #                                       transforms.Normalize(norm_mean, norm_std)])
-    train_transform = transforms.Compose([transforms.ToTensor(),
+    # norm_mean, norm_std = [0.7630318, 0.5456445, 0.5700395], [0.1409281, 0.15261307, 0.16997099]
+    norm_mean, norm_std = [0.5]*3, [0.5]*3
+    train_transform = transforms.Compose([transforms.Resize((args.input_size, args.input_size)),
+                                            transforms.ToTensor(),
                                           transforms.Normalize(norm_mean, norm_std)])
+    # train_transform = transforms.Compose([transforms.ToTensor(),
+    #                                       transforms.Normalize(norm_mean, norm_std)])
 
     # define the transformation of the val images.
-    val_transform = transforms.Compose([transforms.ToTensor(),
-                                        transforms.Normalize(norm_mean, norm_std)])
+    val_transform = transforms.Compose([transforms.Resize((args.input_size, args.input_size)),
+                                          transforms.ToTensor(),
+                                          transforms.Normalize(norm_mean, norm_std)])
+    # val_transform = transforms.Compose([transforms.ToTensor(),
+    #                                     transforms.Normalize(norm_mean, norm_std)])
 
     # -- dataset
     df_train, df_val = preprocess_df(args)
     # Define the training set using the table train_df and using our defined transitions (train_transform)
-    # training_set = HAM10000(df_train, transform=train_transform)
-    training_set = HAM10000(df_train, mode='train', transform=train_transform)
+    training_set = HAM10000_ORG(df_train, transform=train_transform)
     train_loader = DataLoader(training_set, batch_size=args.batch_size, shuffle=True, num_workers=4)
+    # train_loader = DataLoader(training_set, batch_size=args.batch_size, shuffle=True, num_workers=4,drop_last=True)
 
     # Same for the validation set:
-    # validation_set = HAM10000(df_val, transform=val_transform)
-    validation_set = HAM10000(df_val,mode='eval', transform=val_transform)
-    val_loader = DataLoader(validation_set, batch_size=64, shuffle=False, num_workers=4)
+    validation_set = HAM10000_ORG(df_val, transform=val_transform)
+    val_loader = DataLoader(validation_set, batch_size=64, shuffle=True, num_workers=4)
 
     # -- optimizer
     optimizer = optim.SGD(filter(lambda p: p.requires_grad, net.parameters()), lr=args.lr,
