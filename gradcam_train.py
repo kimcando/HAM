@@ -26,6 +26,9 @@ from arguments import get_args
 from dataset import HAM10000, preprocess_df
 from model import resnet8_gn, resnet18_modify, BaseCNN, CNN, GradCamModel
 
+# visualize
+import torchvision
+import matplotlib.pyplot as plt
 def xavier_nets(m):
     if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d):
         torch.nn.init.xavier_uniform(m.weight)
@@ -72,7 +75,7 @@ def train_net(net_id, net,
               optimizer, scheduler,
               train_dataloader, epochs, device="cuda",
               do_pre=False):
-
+    global norm_mean, norm_std
     criterion = nn.CrossEntropyLoss().to(device)
 
     batch_cnt = 0
@@ -89,33 +92,39 @@ def train_net(net_id, net,
             optimizer.zero_grad()
             target = target.long()
             # https://ichi.pro/ko/pytorchui-gradcam-135721179052517
+
+            ## output 받고
             out, selected = net(x) # selected shape: torch.Size([64, 64, 8, 8])
             selected = selected.detach().cpu()
-            breakpoint()
+
             loss = criterion(out, target)
 
             _, pred = torch.max(out, 1)
             correct = torch.sum(pred == target)
             loss.backward()
-            grads = net.get_act_grads().detach().cpu()
-            pooled_grads = torch.mean(grads, dim=[0, 2, 3]).detach().cpu()
-            for i in range(selected.shape[1]):
-                selected[:, i, :, :] += pooled_grads[i]
-            heatmap_j = torch.mean(selected, dim=1).squeeze()
-            heatmap_j_max = heatmap_j.max(axis=0)[0]
-            heatmap_j /= heatmap_j_max
-            breakpoint()
-            import torchvision
-            import matplotlib.pyplot as plt
+            if batch_idx <20:
+                img_idx = 10
+                grads = net.get_act_grads().detach().cpu()
+                pooled_grads = torch.mean(grads, dim=[0, 2, 3]).detach().cpu()
+                for i in range(selected.shape[1]):
+                    selected[:, i, :, :] += pooled_grads[i]
+                heatmap_j = torch.mean(selected, dim=1).squeeze()
+                heatmap_j_max = heatmap_j.max(axis=0)[0]
+                heatmap_j /= heatmap_j_max
 
-            resize = torchvision.transforms.Resize((32, 32))
-            heatmap_j = resize(heatmap_j)
-            # heatmap_j = resize(heatmap_j, (32, 32), preserve_range=True)
-            breakpoint()
-            cmap = plt.cm.get_cmap('jet',256)
-            heatmap_j2 = cmap(heatmap_j, alpha=0.2)
+                # 이미지 변환 -> baseline code에 더 잘 돼있을 것 같음
+                unorm = UnNormalize(mean=norm_mean, std = norm_std)
+                resize = torchvision.transforms.Resize((32, 32))
+                heatmap_j = resize(heatmap_j)
+                # heatmap_j = resize(heatmap_j, (32, 32), preserve_range=True)
+                trs = unorm(x[img_idx])*255
+                img=trs.detach().cpu().permute(1,2,0).numpy().astype('uint8')
 
-            breakpoint()
+                fig=plt.figure(figsize=(8,8))
+                plt.imshow(img)
+                plt.imshow(heatmap_j[img_idx],cmap=plt.cm.jet, alpha=0.2, interpolation='nearest')
+                plt.savefig(f'./imgs/{img_idx}.png')
+
             optimizer.step()
 
             batch_cnt += 1
@@ -172,6 +181,23 @@ def test_net(net_id, net,
     total_loss = loss_val/batch_cnt
     return total_acc, total_loss
 
+class UnNormalize(object):
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, tensor):
+        """
+        Args:
+            tensor (Tensor): Tensor image of size (C, H, W) to be normalized.
+        Returns:
+            Tensor: Normalized image.
+        """
+        for t, m, s in zip(tensor, self.mean, self.std):
+            t.mul_(s).add_(m)
+            # The normalize code -> t.sub_(m).div_(s)
+        return tensor
+
 if __name__=='__main__':
 
     args = get_args()
@@ -199,7 +225,8 @@ if __name__=='__main__':
     #                                       transforms.Normalize(norm_mean, norm_std)])
     train_transform = transforms.Compose([transforms.ToTensor(),
                                           transforms.Normalize(norm_mean, norm_std)])
-
+    # train_transform = transforms.Compose([transforms.ToTensor(),
+    #                                       ])
     # define the transformation of the val images.
     val_transform = transforms.Compose([transforms.ToTensor(),
                                         transforms.Normalize(norm_mean, norm_std)])
@@ -232,10 +259,10 @@ if __name__=='__main__':
         if torch.isnan(torch.tensor(train_loss)):
             break
         print(f' Training at {round} : loss: {train_loss:.6f}, acc:{train_acc:.6%}')
-        test_acc, test_loss = test_net(net_id, net,
-                                                test_dataloader=val_loader,
-                                                epochs=args.epochs)
-        print(f' Test at {round} : loss: {test_loss:.6f}, acc:{test_acc:2.6%}')
+        # test_acc, test_loss = test_net(net_id, net,
+        #                                         test_dataloader=val_loader,
+        #                                         epochs=args.epochs)
+        # print(f' Test at {round} : loss: {test_loss:.6f}, acc:{test_acc:2.6%}')
 
         if args.wandb_log:
             wandb.log({

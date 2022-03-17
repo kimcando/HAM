@@ -20,6 +20,7 @@ class HAM10000(Dataset):
         with open(os.path.join(data_dir,mode+'.npy'), 'rb') as f:
             self.img = np.load(f)
         print(f' data for {mode} loaded.')
+        self.img = self.img.astype('uint8')
         self.df = df
         self.transform = transform
 
@@ -33,6 +34,7 @@ class HAM10000(Dataset):
         y = torch.tensor(int(self.df['cell_type_idx'][index]))
 
         if self.transform:
+
             X = self.transform(X)
 
         return X.float(), y

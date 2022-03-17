@@ -2,3 +2,4 @@ __pycache__
 input
 archive.zip
 wandb
+*.pickle
