@@ -23,6 +23,9 @@ python lr_finder_train.py
 partial_freeze_train.py
 ```
 
+* scripts examples
+  * refer to `full_scripts/`
+
 * arguments settings
   * refer to [arguments.py](https://github.com/kimcando/HAM/blob/main/arguments.py)
 
