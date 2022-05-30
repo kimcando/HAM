@@ -5,7 +5,7 @@ Another more interesting than digit classification dataset to use to get biology
 
 ### Backgrounds and Personal Purpose
 * To observe different behaviors of CNN using Grad-CAM as the training progresses when using **pretrained models** and **training from scratches**
-* [Detailed PDF](https://github.com/kimcando/HAM/blob/main/HAM_%E1%84%80%E1%85%B5%E1%86%B7%E1%84%89%E1%85%A9%E1%84%8B%E1%85%A7%E1%86%AB.pdf) in Korean
+* [Detailed PDF]([https://github.com/kimcando/HAM/blob/main/HAM_%E1%84%80%E1%85%B5%E1%86%B7%E1%84%89%E1%85%A9%E1%84%8B%E1%85%A7%E1%86%AB.pdf](https://github.com/kimcando/HAM/blob/main/assets/HAM_%EA%B9%80%EC%86%8C%EC%97%B0.pdf)) in Korean
 
 ### Usage
 * run
