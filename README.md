@@ -20,9 +20,13 @@ python lr_finder_train.py
 
 * experiments on partial freeze
 ```
-partial_freeze_train.py
+python partial_freeze_train.py
 ```
 
+* experiments on GradCAM
+```
+python gradcam_train.py
+```
 * scripts examples
   * refer to `full_scripts/`
 
